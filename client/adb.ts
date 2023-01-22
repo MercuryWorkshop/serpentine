@@ -1,5 +1,8 @@
 import Adb from "./webadb.js"
 import { parse, stringify, toJSON, fromJSON } from 'flatted';
+import Buffer from "buffer";
+window["Buf"] = Buffer;
+window["prs"] = parse;
 const wait = (t: number) => new Promise<void>((resolve) => setTimeout(resolve, t));
 
 export class AdbController {
@@ -17,9 +20,23 @@ export class AdbController {
         this.adb = await webusb.connectAdb("host::");
         await this.connect();
         setTimeout(async () => {
+            let buffer = "";
             for (; ;) {
-                await this.read();
-                await wait(2000);
+                console.log("pollling");
+                let resp = await this.read();
+                // console.log(resp);
+                if (resp) {
+                    if (resp.includes("\x04")) {
+                        console.log("SPLIT");
+                        let split = resp.split("\x04");
+                        this.handleData(buffer + split[0]);
+                        buffer = split[1];
+                    } else {
+                        buffer += resp;
+                    }
+                }
+                console.log("done polling");
+                await wait(100);
             }
         }, 100);
         return this;
@@ -37,7 +54,7 @@ export class AdbController {
 
 
 
-    async dispatchCommand(command, data) {
+    async dispatchCommand(command, data: object) {
         let id = uuid();
         let writePromise = this.write(JSON.stringify({
             id,
@@ -50,12 +67,9 @@ export class AdbController {
         });
     }
 
-    async write(data) {
+    async write(data: string) {
         if (!this.socket) return;
-        let resp = await this.socket.send_receive("WRTE", data);
-        if (resp.cmd == "WRTE") {
-            this.handleData(resp.data);
-        }
+        let resp = await this.socket.send("WRTE", data);
     }
 
 
@@ -65,14 +79,12 @@ export class AdbController {
 
         let resp = await this.socket.send_receive("OKAY");
         if (resp.cmd == "WRTE") {
-            this.handleData(resp.data);
+            return this.dec.decode(resp.data);
         }
     }
 
     async handleData(data) {
-        let plaintext = this.dec.decode(data);
-
-        let json = parse(plaintext);
+        let json = parse(atob(data));
         let callback = this.callbacks[json.id];
         if (callback) {
             console.log("responding to command " + json.id);

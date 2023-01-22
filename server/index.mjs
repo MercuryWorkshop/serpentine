@@ -46,12 +46,16 @@ server.on('connection', (socket) => {
 });
 
 async function requestCommand(data, socket) {
-    let httpResp = await axios.get(data.url);
+    let httpResp = await axios.get(data.url, { responseType: 'arraybuffer' });
+
+    httpResp.data = Buffer.from(httpResp.data).toString("base64");
     let tcpResp = {
         id: data.id,
         res: httpResp,
     };
+    // console.log(httpResp.data);
 
-    socket.write(stringify(tcpResp));
+    socket.write(btoa(stringify(tcpResp)) + "\x04");
     console.log("sent response");
 }
+// {"command":"REQUEST","id":1,"url":"https://google.com"}
