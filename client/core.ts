@@ -1,11 +1,14 @@
 import { Axios, AxiosResponse } from "axios";
 import { AdbController } from "./adb";
+const wait = (t: number) => new Promise<void>((resolve) => setTimeout(resolve, t));
 
 export class MoltenCore {
     frame: HTMLIFrameElement;
     doc: Document;
     currentURL: URL | null;
     adb: AdbController;
+
+    blobcache: { [key: string]: string } = {};
 
     constructor(_adb: AdbController, options: MoltenOptions) {
         this.frame = options.frame;
@@ -26,53 +29,78 @@ export class MoltenCore {
         // we take the url from the request in case of a redirect.
         console.log(req);
         this.doc.open();
+        let docData = u_atob(req.data);
+        let rewritten = await this.rewriteDoc(docData);
+        this.doc.write(rewritten);
         this.insertHooks();
-        this.doc.write(u_atob(req.data));
         this.doc.close();
 
+    }
+
+    async rewriteDoc(docData: string): Promise<string> {
+        let doc = document.createElement("html");
+        doc.innerHTML = docData;
+        let elms = doc.querySelectorAll("*");
+        for (let node of elms) {
+            await this.nodeRewrite(node);
+        }
+        return doc.innerHTML;
     }
 
     insertHooks() {
         var mutationObserver = new MutationObserver(async (mut) => {
             if (!this.currentURL) return;
             var addedNodes: Node[] = [], removedNodes: Node[] = [];
-            if (window["amg"]) return;
-            // window["amg"] = true;
             mut.forEach(record => record.addedNodes.length & addedNodes.push(...record.addedNodes));
             mut.forEach(record => record.removedNodes.length & removedNodes.push(...record.removedNodes));
 
             for (let node of addedNodes) {
-                if ("src" in node && node.src != "") {
-                    let srcUrl = new URL(node.src as string);
-
-                    let trimmedPathname = srcUrl.pathname;
-                    trimmedPathname = trimmedPathname.substring(1)
-                    let rewritten = this.currentURL.toString() + trimmedPathname;
-
-
-                    console.log(rewritten);
-                    let resp: AxiosResponse = await this.GET(rewritten);
-                    let blob = await b64toBlob(resp.data, resp.headers["content-type"]);
-                    node.src = blob;
-
-                }
-                if ("href" in node && node.href != "") {
-                    let srcUrl = new URL(node.href as string);
-
-                    let trimmedPathname = srcUrl.pathname;
-                    trimmedPathname = trimmedPathname.substring(1)
-                    let rewritten = this.currentURL.toString() + trimmedPathname;
-
-
-                    console.log(rewritten);
-                    let resp: AxiosResponse = await this.GET(rewritten);
-                    let blob = await b64toBlob(resp.data, resp.headers["content-type"]);
-                    node.href = blob;
-
-                }
+                await this.nodeRewrite(node);
             }
         });
         mutationObserver.observe(this.doc, { childList: true, subtree: true })
+    }
+
+    async nodeRewrite(node: Node) {
+        if (!(node instanceof HTMLAnchorElement)) {
+            this.propRewrite(node, "href");
+        }
+        this.propRewrite(node, "src");
+        this.propRewrite(node, "srcset", false);
+        await wait(50); // adb crashes if we don't
+
+    }
+
+    async propRewrite(node: Node, propname: string, standardSrc: boolean = true) {
+
+        if (!this.currentURL) return;
+        if (!(propname in node) || !node[propname]) return;
+
+        let src = node[propname] as string;
+        if (!standardSrc) {
+            src = "file:/" + src;
+        }
+        console.log(src);
+        let propUrl = new URL(src);
+
+
+        node[propname] = await this.blobRewrite(propUrl);
+    }
+    async blobRewrite(url: URL): Promise<string> {
+        let trimmedPathname = url.pathname;
+        trimmedPathname = trimmedPathname.substring(1)
+        let rewritten = this.currentURL!.toString() + trimmedPathname;
+
+        if (rewritten in this.blobcache) {
+            return this.blobcache[rewritten];
+        }
+
+        console.log(rewritten);
+        let resp: AxiosResponse = await this.GET(rewritten);
+        let blob = await b64toBlob(resp.data, resp.headers["content-type"]);
+
+        this.blobcache[rewritten] = blob;
+        return blob;
     }
 
 

@@ -1,0 +1,7 @@
+file:///home/ce/Documents/GitHub/molten/server/index.mjs:66
+        socket.write(btoa(stringify(tcpResp)) + "\x04");
+               ^
+
+TypeError: Cannot read properties of undefined (reading 'write')
+    at requestCommand (file:///home/ce/Documents/GitHub/molten/server/index.mjs:66:16)
+    at processTicksAndRejections (node:internal/process/task_queues:96:5)

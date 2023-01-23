@@ -44,18 +44,28 @@ server.on('connection', (socket) => {
         console.log(`Error: ${err}`);
     });
 });
+// requestCommand({
+//     id: 1,
+//     url: "https://www.google.com/ServiceLogin",
+// });
 
 async function requestCommand(data, socket) {
-    let httpResp = await axios.get(data.url, { responseType: 'arraybuffer' });
+    let httpResp;
+    try {
+        httpResp = await axios.get(data.url, { responseType: 'arraybuffer', headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36' } });
+    } catch (err) {
+        httpResp = err.response;
+    } finally {
+        if (!httpResp?.data) return;
+        httpResp.data = Buffer.from(httpResp.data).toString("base64");
+        let tcpResp = {
+            id: data.id,
+            res: httpResp,
+        };
+        // console.log(httpResp.data);
 
-    httpResp.data = Buffer.from(httpResp.data).toString("base64");
-    let tcpResp = {
-        id: data.id,
-        res: httpResp,
-    };
-    // console.log(httpResp.data);
-
-    socket.write(btoa(stringify(tcpResp)) + "\x04");
-    console.log("sent response");
+        socket.write(btoa(stringify(tcpResp)) + "\x04");
+        console.log("sent response");
+    }
 }
 // {"command":"REQUEST","id":1,"url":"https://google.com"}
