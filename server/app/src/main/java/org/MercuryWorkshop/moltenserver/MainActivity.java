@@ -2,21 +2,40 @@ package org.MercuryWorkshop.moltenserver;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.security.Permissions;
+import java.util.Base64;
 import java.util.Scanner;
 
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -25,6 +44,12 @@ import android.widget.TextView;
 import org.json.*;
 
 import javax.net.ssl.HttpsURLConnection;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.internal.http.HttpHeaders;
+import okhttp3.internal.http2.Header;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -39,13 +64,77 @@ public class MainActivity extends AppCompatActivity {
 
         textViewDataFromClient = (TextView) findViewById(R.id.textViewDataFromClient);
 
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.MANAGE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.MANAGE_EXTERNAL_STORAGE},
+                    1);
+            Log.e("MoltenServer","jsakd");
+
+        }else{
+            Log.e("MoltenServer","ASDJKASDL");
+        }
+//        Thread thread = new Thread(new Runnable() {
+//
+//            OkHttpClient client = new OkHttpClient();
+//            URL url = null;
+//            @Override
+//            public void run() {
+//                try {
+//                    url = new URL("https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png");
+//                } catch (
+//                        MalformedURLException e) {
+//                    throw new RuntimeException(e);
+//                }
+//
+//                Request req = new Request.Builder().url(url).build();
+//                try (
+//                        Response httpResp = client.newCall(req).execute()) {
+//
+//
+//                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+//                        byte[] b = httpResp.body().source().readByteArray();
+////                        byte[] body = httpResp.body().bytes();
+////                        body.toString();
+////                        String read = httpResp.body().source().readUtf8();
+////
+////                        ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+////
+////                        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("/storage/emulated/0/Documents/fuck.png"), "utf8"));
+////
+////                        bw.write(Base64.getMimeEncoder().encodeToString(b));
+//                        bw.close();
+//                    }
+//                } catch (
+//                        IOException e) {
+//                    throw new RuntimeException(e);
+//                }
+//            }
+//        });
+//        thread.start();
         startServerSocket();
+    }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 1) {
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("MoltenServer","thranted??/");
+                // Permission granted, do your work
+            } else {
+                Log.d("MoltenServer","asdjaskldjklas");
+//                Log.d("MoltenServer",permissions);
+            }
+        }
     }
 
     private void listenToClient(Socket sock) {
         Thread thread = new Thread(new Runnable() {
             private boolean end = false;
             private String stringData = null;
+            OkHttpClient client = new OkHttpClient();
 
             @Override
             public void run() {
@@ -56,22 +145,34 @@ public class MainActivity extends AppCompatActivity {
                     while (!end) {
 //                        output.println("CONNECTION");
                         stringData = input.readLine();
-                        if (stringData == null) end = true;
-                        JSONObject obj = new JSONObject(stringData);
-                        URL url = new URL(obj.getString("url"));
-                        HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
+                        if (stringData == null) {
+                            end = true;
+                            return;
+                        }
                         try {
-                            InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+                            JSONObject obj = new JSONObject(stringData);
+                            URL url = new URL(obj.getString("url"));
+                            Request req = new Request.Builder().url(url).build();
+                            try (Response httpResp = client.newCall(req).execute()) {
 
-                            Scanner s = new Scanner(in).useDelimiter("\\A");
-                            String result = s.hasNext() ? s.next() : "";
 
-                            output.println(result);
-                        } finally {
-                            urlConnection.disconnect();
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    byte[] body = httpResp.body().source().readByteArray();
+
+                                    JSONObject resp = new JSONObject();
+                                    resp.put("id", obj.getString("id"));
+                                    resp.put("data", Base64.getMimeEncoder().encodeToString(body));
+
+                                    resp.put("headers",httpResp.headers().toMultimap());
+                                    output.println(resp.toString() + "\004");
+
+                                }
+                            }
+                        }catch (Exception e){
+                            Log.d("MoltenServer",e.toString());
                         }
 
-                        Log.d("MoltenServer",stringData += ":EOL");
+                        Log.e("MoltenServer",stringData += ":EOL");
                         output.flush();
 //                        android.os.Process.killProcess(android.os.Process.myPid());
 
@@ -99,8 +200,6 @@ public class MainActivity extends AppCompatActivity {
                     output.close();
                     sock.close();
                 }catch (IOException e){
-                    throw new RuntimeException(e);
-                } catch (JSONException e) {
                     throw new RuntimeException(e);
                 }
             }

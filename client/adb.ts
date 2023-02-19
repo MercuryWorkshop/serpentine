@@ -1,105 +1,104 @@
-import Adb from "./webadb.js"
-import { parse, stringify, toJSON, fromJSON } from 'flatted';
+import { Adb, decodeUtf8, WritableStream } from "@yume-chan/adb";
+import AdbWebUsbBackend from "@yume-chan/adb-backend-webusb";
+import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import Buffer from "buffer";
 window["Buf"] = Buffer;
-window["prs"] = parse;
 const wait = (t: number) => new Promise<void>((resolve) => setTimeout(resolve, t));
 
 export class AdbController {
     dec: TextDecoder;
+    enc: TextEncoder;
     adb: any;
     socket: any;
+    writer: any;
 
     callbacks: Function[] = [];
+    // commandQueue: { command: string, data: object, resolve: Function }[] = [];
 
-    commandQueue: { command: string, data: object, resolve: Function }[] = [];
+
 
     constructor() {
         this.dec = new TextDecoder();
+        this.enc = new TextEncoder();
     }
     async start() {
-        let webusb = await Adb.open("WebUSB");
-        this.adb = await webusb.connectAdb("host::");
-        await this.connect();
-        setTimeout(async () => {
-            let buffer = "";
-            for (; ;) {
-                console.log("pollling");
-                let resp = await this.read();
-                // console.log(resp);
-                if (resp) {
-                    if (resp.includes("\x04")) {
-                        console.log("SPLIT");
-                        let split = resp.split("\x04");
-                        this.handleData(buffer + split[0]);
-                        buffer = split[1];
-                    } else {
-                        buffer += resp;
-                    }
-                }
-                console.log("done polling");
-                await wait(500);
-            }
-        }, 100);
-        setTimeout(async () => {
-            for (; ;) {
-                await wait(1000);
-                let com = this.commandQueue.shift();
-                if (!com) continue;
-                let id = uuid();
-                let writePromise = this.write(JSON.stringify({
-                    id,
-                    command: com.command,
-                    ...com.data
-                }))
-                console.log("dispatching command " + id);
-                this.callbacks[id] = com.resolve;
-            }
-        }, 100);
-
+        const credentialStore = new AdbWebCredentialStore();
+        const device = await AdbWebUsbBackend.requestDevice();
+        const streams = await device!.connect();
+        // console.log(streams);
+        this.adb = await Adb.authenticate(streams, credentialStore, undefined);
         return this;
     }
     async connect() {
-        if (!this.adb) return;
-        this.socket = await this.adb.open("tcp:1337");
+
+        this.socket = await this.adb.createSocket("tcp:1234");
+        this.writer = this.socket.writable.getWriter();
+
+        let pipebuf = "";
+        this.socket.readable.pipeTo(new WritableStream({
+            write: bytes => {
+                let chunk = decodeUtf8(bytes);
+                // console.log(chunk.toString());
+                if (chunk.includes("\x04")) {
+                    let split = chunk.split("\x04");
+                    this.handleData(pipebuf + split[0]);
+                    pipebuf = split[1];
+                } else {
+                    pipebuf += chunk;
+                }
+            }
+        }));
+        // setTimeout(async () => {
+        //     for (; ;) {
+        //         await wait(1000);
+        //         let com = this.commandQueue.shift();
+        //         if (!com) continue;
+        //         let id = uuid();
+        //         let writePromise = this.write(JSON.stringify({
+        //             id,
+        //             command: com.command,
+        //             ...com.data
+        //         }));
+        //         console.log("dispatching command " + id);
+        //         this.callbacks[id] = com.resolve;
+        //     }
+        // }, 100);
+
+        return this;
     }
 
-    // async eventLoop() {
-    //     await this.read();
+
+
+
+    // async enqueueCommand(command: string, data: object) {
+    //     return new Promise((resolve) => {
+    //         this.commandQueue.push({
+    //             command,
+    //             data,
+    //             resolve,
+    //         });
+    //     });
     // }
-
-
-
-
-
-    async enqueueCommand(command: string, data: object) {
+    async dispatchCommand(command, data: object) {
+        let id = uuid();
+        let writePromise = this.write(JSON.stringify({
+            id,
+            command,
+            ...data
+        }))
+        console.log("dispatching command " + id);
         return new Promise((resolve) => {
-            this.commandQueue.push({
-                command,
-                data,
-                resolve,
-            });
+            this.callbacks[id] = resolve;
         });
     }
 
     async write(data: string) {
-        if (!this.socket) return;
-        let resp = await this.socket.send("WRTE", data);
-    }
-
-
-
-    async read() {
-        if (!this.socket) return;
-
-        let resp = await this.socket.send_receive("OKAY");
-        if (resp.cmd == "WRTE") {
-            return this.dec.decode(resp.data);
-        }
+        if (!this.writer) return;
+        await this.writer.write(this.enc.encode(data + "\n"));
     }
 
     async handleData(data) {
-        let json = parse(atob(data));
+        let json = JSON.parse(data);
         let callback = this.callbacks[json.id];
         if (callback) {
             console.log("responding to command " + json.id);

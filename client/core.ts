@@ -127,7 +127,7 @@ export class MoltenCore {
 
 
     async GET(url: string): Promise<AxiosResponse> {
-        let req = await this.adb.enqueueCommand("REQUEST", {
+        let req = await this.adb.dispatchCommand("REQUEST", {
             url
         }) as RequestResponse;
         return req.res;
