@@ -22,10 +22,18 @@
     "webpack-dev-server": "^4.11.1"
   },
   "dependencies": {
-    "@yume-chan/adb": "^0.0.17",
+    "@adobe/css-tools": "^4.1.0",
+    "@tomphttp/bare-client": "^1.1.2-beta.3",
+    "@yume-chan/adb": "^0.0.16",
+    "@yume-chan/adb-backend-webusb": "^0.0.16",
+    "@yume-chan/adb-credential-web": "^0.0.16",
     "axios": "^1.2.3",
     "buffer": "^6.0.3",
+    "corium": "file:corium",
+    "css-tree": "^2.3.1",
     "flatted": "^3.2.7",
+    "path-browserify": "^1.0.1",
+    "util": "^0.12.5",
     "webadb": "github:webadb/webadb.js"
   }
 }

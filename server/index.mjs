@@ -25,7 +25,7 @@ server.on('connection', (socket) => {
     // The server can also receive data from the client by reading from its socket.
     socket.on('data', async (chunk) => {
         console.log(`Data received from client: ${chunk.toString()}`);
-        let data = JSON.parse(chunk.toString().replace("\n", ""));
+        let data = JSON.parse(chunk.toString().replace("\n", "").trim());
 
         switch (data.command) {
             case "REQUEST":

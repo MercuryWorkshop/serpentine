@@ -12,6 +12,8 @@ export class AdbController {
 
     callbacks: Function[] = [];
 
+    commandQueue: { command: string, data: object, resolve: Function }[] = [];
+
     constructor() {
         this.dec = new TextDecoder();
     }
@@ -36,9 +38,25 @@ export class AdbController {
                     }
                 }
                 console.log("done polling");
-                await wait(100);
+                await wait(500);
             }
         }, 100);
+        setTimeout(async () => {
+            for (; ;) {
+                await wait(1000);
+                let com = this.commandQueue.shift();
+                if (!com) continue;
+                let id = uuid();
+                let writePromise = this.write(JSON.stringify({
+                    id,
+                    command: com.command,
+                    ...com.data
+                }))
+                console.log("dispatching command " + id);
+                this.callbacks[id] = com.resolve;
+            }
+        }, 100);
+
         return this;
     }
     async connect() {
@@ -54,16 +72,13 @@ export class AdbController {
 
 
 
-    async dispatchCommand(command, data: object) {
-        let id = uuid();
-        let writePromise = this.write(JSON.stringify({
-            id,
-            command,
-            ...data
-        }))
-        console.log("dispatching command " + id);
+    async enqueueCommand(command: string, data: object) {
         return new Promise((resolve) => {
-            this.callbacks[id] = resolve;
+            this.commandQueue.push({
+                command,
+                data,
+                resolve,
+            });
         });
     }
 

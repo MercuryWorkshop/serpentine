@@ -1,5 +1,6 @@
 import { Axios, AxiosResponse } from "axios";
 import { AdbController } from "./adb";
+import * as CSS from "@adobe/css-tools";
 const wait = (t: number) => new Promise<void>((resolve) => setTimeout(resolve, t));
 
 export class MoltenCore {
@@ -29,15 +30,17 @@ export class MoltenCore {
         // we take the url from the request in case of a redirect.
         console.log(req);
         this.doc.open();
+
         let docData = u_atob(req.data);
-        let rewritten = await this.rewriteDoc(docData);
+        let rewritten = await this.docRewrite(docData);
         this.doc.write(rewritten);
         this.insertHooks();
+
         this.doc.close();
 
     }
 
-    async rewriteDoc(docData: string): Promise<string> {
+    async docRewrite(docData: string): Promise<string> {
         let doc = document.createElement("html");
         doc.innerHTML = docData;
         let elms = doc.querySelectorAll("*");
@@ -62,51 +65,69 @@ export class MoltenCore {
     }
 
     async nodeRewrite(node: Node) {
-        if (!(node instanceof HTMLAnchorElement)) {
+        if (node instanceof HTMLAnchorElement) {
+            if (!node.href) return;
+            let href = node.href;
+            node.href = "javascript:void()";
+            node.onclick = () => {
+                this.visit(href);
+            };
+        }
+        else {
             this.propRewrite(node, "href");
         }
         this.propRewrite(node, "src");
-        this.propRewrite(node, "srcset", false);
-        await wait(50); // adb crashes if we don't
+        this.propRewrite(node, "srcset");
+        await wait(150); // adb crashes if we don't
 
     }
 
-    async propRewrite(node: Node, propname: string, standardSrc: boolean = true) {
+    async propRewrite(node: Node, propname: string) {
 
         if (!this.currentURL) return;
         if (!(propname in node) || !node[propname]) return;
 
         let src = node[propname] as string;
-        if (!standardSrc) {
-            src = "file:/" + src;
-        }
-        console.log(src);
-        let propUrl = new URL(src);
-
-
-        node[propname] = await this.blobRewrite(propUrl);
+        // qualify source needs to change in some edge cases. consider passing around a currentOrigin everywhere;
+        node[propname] = await this.blobRewrite(qualifyURL(this.currentURL.origin, src));
     }
-    async blobRewrite(url: URL): Promise<string> {
-        let trimmedPathname = url.pathname;
-        trimmedPathname = trimmedPathname.substring(1)
-        let rewritten = this.currentURL!.toString() + trimmedPathname;
-
-        if (rewritten in this.blobcache) {
-            return this.blobcache[rewritten];
+    async blobRewrite(absurl: string): Promise<string> {
+        let resp: AxiosResponse = await this.GET(absurl);
+        let blob;
+        console.log(absurl);
+        console.log(resp.headers["content-type"]);
+        if (resp.headers["content-type"]?.includes("text/css")) {
+            let fetched = await fetch("data:" + resp.headers["content-type"] + ";base64," + resp.data);
+            let contents = await fetched.text();
+            console.log("nawww fr bruh no way")
+            blob = URL.createObjectURL(new Blob([await this.rewriteRawCSS(contents)], { type: resp.headers["content-type"] }));
+        } else {
+            blob = await b64toBlob(resp.data, resp.headers["content-type"]);
         }
-
-        console.log(rewritten);
-        let resp: AxiosResponse = await this.GET(rewritten);
-        let blob = await b64toBlob(resp.data, resp.headers["content-type"]);
-
-        this.blobcache[rewritten] = blob;
+        this.blobcache[absurl] = blob;
         return blob;
+    }
+    async rewriteRawCSS(contents: string): Promise<string> {
+        let parsed = CSS.parse(contents);
+
+        for (let rule of parsed.stylesheet.rules) {
+            console.log(rule);
+            if (rule.type == "import") {
+                let strippedhref = rule.import;
+                strippedhref = strippedhref.substring(4, strippedhref.length - 2);
+                console.log(strippedhref);
+                // rule.import = this.blobRewrite(strippedhref);
+                // bruh
+            }
+        }
+        console.log("ASKLDHASHDJKLHASDJKASDHKASJHDJKK")
+        return CSS.stringify(parsed);
     }
 
 
 
     async GET(url: string): Promise<AxiosResponse> {
-        let req = await this.adb.dispatchCommand("REQUEST", {
+        let req = await this.adb.enqueueCommand("REQUEST", {
             url
         }) as RequestResponse;
         return req.res;
@@ -124,4 +145,10 @@ export interface RequestResponse { id: number, res: AxiosResponse }
 
 export interface MoltenOptions {
     frame: HTMLIFrameElement;
+}
+function qualifyURL(tgt, url) {
+    var img = document.createElement('img');
+    img.src = url;
+    url = img.src;
+    return url.replace(document.location.origin, tgt);
 }
