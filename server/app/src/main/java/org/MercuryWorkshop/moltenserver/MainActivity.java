@@ -23,6 +23,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.Permissions;
 import java.util.Base64;
+import java.util.Iterator;
 import java.util.Scanner;
 
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -45,8 +46,10 @@ import org.json.*;
 
 import javax.net.ssl.HttpsURLConnection;
 
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.internal.http.HttpHeaders;
 import okhttp3.internal.http2.Header;
@@ -150,17 +153,32 @@ public class MainActivity extends AppCompatActivity {
                             return;
                         }
                         try {
-                            JSONObject obj = new JSONObject(stringData);
-                            URL url = new URL(obj.getString("url"));
-                            Request req = new Request.Builder().url(url).build();
-                            try (Response httpResp = client.newCall(req).execute()) {
+                            JSONObject request = new JSONObject(stringData);
+                            JSONObject reqHeaders = request.getJSONObject("headers");
+                            URL url = new URL(request.getString("url"));
+                            Request.Builder builder = new Request.Builder().url(url);
+
+
+                            if (!request.getString("method").equalsIgnoreCase("get")) {
+                                Log.d("MoltenServer",request.getString("method"));
+                                builder.method(request.getString("method"), RequestBody.create(MediaType.parse(reqHeaders.getString("Content-Type")), request.getString("body")));
+                            }
+                            for (Iterator<String> it = reqHeaders.keys(); it.hasNext(); ) {
+                                String key = it.next();
+                                if (!key.equals("Authorization")) {
+                                    builder.header(key, reqHeaders.getString(key));
+                                }
+                            }
+
+                            Request httpreq = builder.build();
+                            try (Response httpResp = client.newCall(httpreq).execute()) {
 
 
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                     byte[] body = httpResp.body().source().readByteArray();
 
                                     JSONObject resp = new JSONObject();
-                                    resp.put("id", obj.getString("id"));
+                                    resp.put("id", request.getString("id"));
                                     resp.put("data", Base64.getMimeEncoder().encodeToString(body));
 
                                     resp.put("headers",httpResp.headers().toMultimap());
