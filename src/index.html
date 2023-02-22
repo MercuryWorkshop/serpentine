@@ -5,12 +5,16 @@
   <title>Porxy</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    window["proccess"] = { env: { NODE_DEBUG: false } };
+  </script>
   <script src="../dist/main.js"></script>
 </head>
 
 <body>
   <button id="start">start</button>
-  <iframe id="proxyframe" width="1000" height="700"></iframe>
+  <iframe id="proxyframe" width="1000" height="700"
+    sandbox="allow-scripts allow-forms allow-pointer-lock allow-same-origin"></iframe>
 </body>
 
 </html>

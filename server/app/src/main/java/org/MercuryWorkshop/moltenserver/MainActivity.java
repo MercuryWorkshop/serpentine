@@ -137,11 +137,15 @@ public class MainActivity extends AppCompatActivity {
         Thread thread = new Thread(new Runnable() {
             private boolean end = false;
             private String stringData = null;
-            OkHttpClient client = new OkHttpClient();
+            OkHttpClient client = new OkHttpClient().newBuilder()
+                    .followRedirects(false)
+                    .followSslRedirects(false)
+                    .build();
 
             @Override
             public void run() {
                 try {
+
 
                     BufferedReader input = new BufferedReader(new InputStreamReader(sock.getInputStream()));
                     PrintWriter output = new PrintWriter(sock.getOutputStream());
@@ -170,6 +174,7 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             }
 
+
                             Request httpreq = builder.build();
                             try (Response httpResp = client.newCall(httpreq).execute()) {
 
@@ -181,7 +186,15 @@ public class MainActivity extends AppCompatActivity {
                                     resp.put("id", request.getString("id"));
                                     resp.put("data", Base64.getMimeEncoder().encodeToString(body));
 
-                                    resp.put("headers",httpResp.headers().toMultimap());
+
+                                    JSONObject headers = new JSONObject();
+
+                                    for (Iterator<String> it = httpResp.headers().toMultimap().keySet().iterator(); it.hasNext(); ) {
+                                        String key = it.next();
+                                        headers.put(key,httpResp.header(key));
+                                    }
+                                    resp.put("status",httpResp.code());
+                                    resp.put("headers",headers);
                                     output.println(resp.toString() + "\004");
 
                                 }

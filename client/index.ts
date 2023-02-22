@@ -18,6 +18,7 @@ window.onload = () => {
         window["adb"] = adb;
     });
 };
+// window["rw"] =
 
 window["a"] = (s) => {
     window["adb"].connect();
@@ -29,5 +30,7 @@ window["a"] = (s) => {
 
     let frame = (document.getElementById("proxyframe")! as HTMLIFrameElement).contentWindow as unknown as Win;
     let indow = openWindow(new Request(s), "_self", frame, client as BareClient, "replace");
+
+    window["win"] = indow;
 }
 

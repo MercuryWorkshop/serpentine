@@ -106,7 +106,6 @@ export class AdbController {
         } else {
             console.error("got a response for a command that does not exist. this should not happen.")
         }
-        console.log(json);
     }
 
 }

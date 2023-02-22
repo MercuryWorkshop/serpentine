@@ -27,13 +27,24 @@
     "@yume-chan/adb": "^0.0.16",
     "@yume-chan/adb-backend-webusb": "^0.0.16",
     "@yume-chan/adb-credential-web": "^0.0.16",
+    "assert": "^2.0.0",
     "axios": "^1.2.3",
+    "browserify-zlib": "^0.2.0",
     "buffer": "^6.0.3",
     "corium": "file:corium",
+    "crypto-browserify": "^3.12.0",
     "css-tree": "^2.3.1",
     "flatted": "^3.2.7",
+    "https-browserify": "^1.0.0",
+    "jsdom": "^21.1.0",
+    "os-browserify": "^0.3.0",
     "path-browserify": "^1.0.1",
+    "perf_hooks": "^0.0.1",
+    "rollup": "^3.17.2",
+    "stream-browserify": "^3.0.0",
+    "stream-http": "^3.2.0",
     "util": "^0.12.5",
-    "webadb": "github:webadb/webadb.js"
+    "webadb": "github:webadb/webadb.js",
+    "zlib": "^1.0.5"
   }
 }

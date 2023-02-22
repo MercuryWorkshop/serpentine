@@ -1,7 +1,6 @@
 // a drop-in serverless replacement for https://github.com/tomphttp/bare-client which communicates with the molten backend using the Scorch:tm: protocol
 import BareClient, { GenericClient, BareBodyInit, BareCache, BareFetchInit, BareHeaders, BareHTTPProtocol, BareManifest, BareMethod, BareResponse, BareResponseFetch, BareWebSocket, BareWSProtocol, urlLike, createBareClient } from "@tomphttp/bare-client";
 import { AdbController } from "./adb";
-import { RequestResponse } from "./core";
 
 export class ScorchClient extends BareClient {
     private adb: AdbController;
@@ -17,7 +16,13 @@ export class ScorchClient extends BareClient {
         return self;
     }
     async request(method: BareMethod, requestHeaders: BareHeaders, body: BareBodyInit, protocol: BareHTTPProtocol, host: string, port: string | number, path: string, cache: BareCache | undefined, signal: AbortSignal | undefined): Promise<BareResponse> {
-        console.log(method, requestHeaders, body, protocol, host, port, path, cache, signal);
+        // console.log(method, requestHeaders, body, protocol, host, port, path, cache, signal);
+
+        // let cli = await createBareClient("https://el.riftriot2.repl.co/bare/");
+        // let r = await cli.request(method, requestHeaders, body, protocol, host, port, path, cache, signal);
+
+        // return r;
+        // console.log(r);
 
         if (!requestHeaders["Content-Type"]) {
             requestHeaders["Content-Type"] = "text/plain";
@@ -28,16 +33,21 @@ export class ScorchClient extends BareClient {
             body: body || "",
             method,
         }) as any;
+        console.log("dispatching");
 
-        let headers = parseHeaders(req.headers);
+
+        let headers = req.headers;
+        headers["Content-Type"] = headers["content-type"];
+
 
         let b64hack = await fetch("data:" + headers["Content-Type"] + ";base64," + req.data);
 
         let result: Response & Partial<BareResponse> = new Response(b64hack.body, {
-            status: 200,
-            statusText: "OK", //todo obviously
-            headers: headers
+            status: req.status,
+            // statusText: "OK", //todo obviously
+            headers: headers,
         });
+
         // console.log(req.res.headers);
         result.rawHeaders = headers as BareHeaders;
         result.rawResponse = result; // this shouldl be raw
@@ -48,22 +58,15 @@ export class ScorchClient extends BareClient {
 
     }
     async connect(requestHeaders: BareHeaders, protocol: BareWSProtocol, host: string, port: string | number, path: string): Promise<BareWebSocket> {
-        console.log("A<POGN");
-
         throw "not implemented";
     }
 
 }
 
-export function createScorchClient(adb: AdbController) {
-
-}
 
 // example {accept-ranges=[bytes], age=[226414], cache-control=[max-age=604800], content-type=[text/html; charset=UTF-8], date=[Sun, 19 Feb 2023 19:14:29 GMT], etag=["3147526947"], expires=[Sun, 26 Feb 2023 19:14:29 GMT], last-modified=[Thu, 17 Oct 2019 07:18:26 GMT], server=[ECS (cha/81DE)], vary=[Accept-Encoding], x-cache=[HIT]}
-function parseHeaders(_raw: string): { [index: string]: string } {
-    console.log(_raw);
+function javaparse(_raw: string): { [index: string]: string } {
     let raw = _raw.substring(1, _raw.length - 1);
-    // cut off the {} from the ends
 
     let headers = {};
     let i = 0;
