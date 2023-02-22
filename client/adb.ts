@@ -85,8 +85,7 @@ export class AdbController {
             id,
             command,
             ...data
-        }))
-        console.log("dispatching command " + id);
+        }));
         return new Promise((resolve) => {
             this.callbacks[id] = resolve;
         });
@@ -101,7 +100,7 @@ export class AdbController {
         let json = JSON.parse(data);
         let callback = this.callbacks[json.id];
         if (callback) {
-            console.log("responding to command " + json.id);
+            console.log("responding to command");
             callback(json);
         } else {
             console.error("got a response for a command that does not exist. this should not happen.")

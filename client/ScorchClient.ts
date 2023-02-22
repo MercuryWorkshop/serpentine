@@ -33,7 +33,17 @@ export class ScorchClient extends BareClient {
             body: body || "",
             method,
         }) as any;
-        console.log("dispatching");
+        // console.log("dispatching");
+        if ("error" in req) {
+            console.error(atob(req.error));
+            let result: Response & Partial<BareResponse> = new Response(atob(req.error));
+
+            // console.log(req.res.headers);
+            result.rawHeaders = {} as BareHeaders;
+            result.rawResponse = result; // this shouldl be raw
+            return result as BareResponse;
+        }
+
 
 
         let headers = req.headers;

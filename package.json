@@ -37,6 +37,7 @@
     "flatted": "^3.2.7",
     "https-browserify": "^1.0.0",
     "jsdom": "^21.1.0",
+    "meriyah": "^4.3.4",
     "os-browserify": "^0.3.0",
     "path-browserify": "^1.0.1",
     "perf_hooks": "^0.0.1",
