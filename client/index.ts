@@ -13,15 +13,13 @@ window.onload = () => {
         // console.log("asd");
 
         console.log("Asd");
-        adb.connect();
+        adb.connect(10);
 
         window["adb"] = adb;
     });
 };
-// window["rw"] =
 
 window["a"] = (s) => {
-    window["adb"].connect();
 
     let abort = new AbortController();
 

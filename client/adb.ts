@@ -1,4 +1,4 @@
-import { Adb, decodeUtf8, WritableStream } from "@yume-chan/adb";
+import { Adb, AdbSocket, decodeUtf8, WritableStream } from "@yume-chan/adb";
 import AdbWebUsbBackend from "@yume-chan/adb-backend-webusb";
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import Buffer from "buffer";
@@ -8,9 +8,9 @@ const wait = (t: number) => new Promise<void>((resolve) => setTimeout(resolve, t
 export class AdbController {
     dec: TextDecoder;
     enc: TextEncoder;
-    adb: any;
-    socket: any;
-    writer: any;
+    adb: Adb;
+    socket: AdbSocket;
+    writer: WritableStreamDefaultWriter;
 
     callbacks: Function[] = [];
     // commandQueue: { command: string, data: object, resolve: Function }[] = [];
@@ -25,20 +25,37 @@ export class AdbController {
         const credentialStore = new AdbWebCredentialStore();
         const device = await AdbWebUsbBackend.requestDevice();
         const streams = await device!.connect();
-        // console.log(streams);
+
         this.adb = await Adb.authenticate(streams, credentialStore, undefined);
         return this;
     }
-    async connect() {
 
-        this.socket = await this.adb.createSocket("tcp:1234");
+
+    async tryAccSocket(tries: number): Promise<AdbSocket | null> {
+        try {
+            return await this.adb.createSocket("tcp:1234");
+        } catch {
+            if (tries > 0) {
+                await wait(100);
+                return this.tryAccSocket(tries - 1);
+            } else
+                return null;
+        }
+    }
+    async connect(tries: number): Promise<AdbController | null> {
+        let socketresult = await this.tryAccSocket(tries);
+        if (!socketresult) {
+            console.error(`Couldn't connect to socket after ${tries} tries`)
+            return null;
+        }
+        this.socket = socketresult;
         this.writer = this.socket.writable.getWriter();
 
         let pipebuf = "";
         this.socket.readable.pipeTo(new WritableStream({
             write: bytes => {
                 let chunk = decodeUtf8(bytes);
-                // console.log(chunk.toString());
+                // console.log(chunk.toString()[chunk.length - 1]);
                 if (chunk.includes("\x04")) {
                     let split = chunk.split("\x04");
                     this.handleData(pipebuf + split[0]);
@@ -81,12 +98,12 @@ export class AdbController {
     // }
     async dispatchCommand(command, data: object) {
         let id = uuid();
-        let writePromise = this.write(JSON.stringify({
+        this.write(JSON.stringify({
             id,
             command,
             ...data
         }));
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             this.callbacks[id] = resolve;
         });
     }
@@ -97,13 +114,20 @@ export class AdbController {
     }
 
     async handleData(data) {
-        let json = JSON.parse(data);
-        let callback = this.callbacks[json.id];
-        if (callback) {
-            console.log("responding to command");
-            callback(json);
-        } else {
-            console.error("got a response for a command that does not exist. this should not happen.")
+        try {
+            let json = JSON.parse(data);
+            let callback = this.callbacks[json.id];
+            if (callback) {
+                console.log("responding to command");
+                callback(json);
+            } else {
+                console.error("got a response for a command that does not exist. this should not happen.")
+            }
+        } catch {
+            console.error("god dammit");
+            let parts = data.split("}}{\"id\"");
+            await this.handleData(parts[0] + "}}");
+            await this.handleData("{\"id\"" + parts[1]);
         }
     }
 

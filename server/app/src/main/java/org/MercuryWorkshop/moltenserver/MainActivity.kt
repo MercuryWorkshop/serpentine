@@ -170,6 +170,7 @@ class MainActivity() : AppCompatActivity() {
                                         resp.put("status", httpResp.code())
                                         resp.put("headers", headers)
                                         output.println(resp.toString() + "\u0004")
+                                        output.flush();
                                     }
                                 }
                             }catch (e: Exception){
@@ -180,6 +181,7 @@ class MainActivity() : AppCompatActivity() {
                                     Base64.getMimeEncoder().encodeToString(e.toString().toByteArray())
                                 )
                                 output.println(resp.toString() + "\u0004")
+                                output.flush();
                             }
                         } catch (e: Exception) {
                             Log.d("MoltenServer", e.toString())
