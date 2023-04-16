@@ -1,5 +1,5 @@
 {
-  "name": "molten",
+  "name": "serpentine",
   "version": "1.0.0",
   "description": "a webadb based proxy",
   "main": "index.js",

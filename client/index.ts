@@ -1,9 +1,8 @@
-// import openWindow, { deleteWindow } from "corium/src/hooks";
-import { Win, openWindow } from "corium";
+import { openWindow, deleteWindow } from "corium";
 import BareClient, { createBareClient } from "@tomphttp/bare-client";
 import { ScorchClient } from "./ScorchClient";
 import { AdbController } from "./adb";
-// import { MoltenCore } from "../client/core";
+import { Win } from "corium";
 
 window.onload = () => {
     document.querySelector("#start")!.addEventListener("click", async () => {
