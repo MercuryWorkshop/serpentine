@@ -123,8 +123,8 @@ export class AdbController {
             } else {
                 console.error("got a response for a command that does not exist. this should not happen.")
             }
-        } catch {
-            console.error("god dammit");
+        } catch (e) {
+            console.error(e, data);
             let parts = data.split("}}{\"id\"");
             await this.handleData(parts[0] + "}}");
             await this.handleData("{\"id\"" + parts[1]);
@@ -135,7 +135,7 @@ export class AdbController {
 function uuid() { // Public Domain/MIT
     var d = new Date().getTime();//Timestamp
     var d2 = ((typeof performance !== 'undefined') && performance.now && (performance.now() * 1000)) || 0;//Time in microseconds since page-load or 0 if unsupported
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16;//random number between 0 and 16
         if (d > 0) {//Use timestamp until depleted
             r = (d + r) % 16 | 0;

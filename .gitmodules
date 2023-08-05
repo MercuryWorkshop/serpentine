@@ -1,3 +1,12 @@
 [submodule "corium"]
 path = corium
 url = https://github.com/MercuryWorkshop/corium
+[submodule "Ultraviolet"]
+	path = Ultraviolet
+	url = https://github.com/titaniumnetwork-dev/Ultraviolet
+[submodule "Velocity"]
+	path = Velocity
+	url = https://github.com/cohenerickson/Velocity
+[submodule "aboutproxy"]
+	path = aboutproxy
+	url = https://github.com/MercuryWorkshop/aboutproxy
